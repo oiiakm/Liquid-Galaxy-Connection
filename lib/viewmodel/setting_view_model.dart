@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:dartssh2/dartssh2.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -52,6 +53,7 @@ class SettingViewModel extends GetxController {
       await prefs.setString('sshPort', sshPort.value);
       await prefs.setString('userName', userName.value);
       await prefs.setString('password', password.value);
+      await prefs.setString('numberOfRigs', numberOfRigs.value);
       isConnected.value = true;
     } catch (error) {
       print('Error updating data: $error');
@@ -62,25 +64,69 @@ class SettingViewModel extends GetxController {
 
   void updateConnectionStatus(bool status) {
     isConnected.value = status;
+    update();
   }
 
-  // Connect LG
-  Future<bool?> connectToLG() async {
-    await fetchData();
-    try {
-      client = SSHClient(
-        await SSHSocket.connect(ipAddress.value, int.parse(sshPort.value)),
-        username: userName.value,
-        onPasswordRequest: () => password.value,
-      );
-      isConnected.value = true;
-      return true;
-    } on SocketException catch (e) {
-      print(e);
+  // Connect LG with retries
+  Future<bool?> connectToLG({int maxRetries = 10}) async {
+    int retryCount = 0;
 
-      isConnected.value = false;
+    while (retryCount < maxRetries && !isConnected.value) {
+      await fetchData();
+
+      try {
+        client = SSHClient(
+          await SSHSocket.connect(ipAddress.value, int.parse(sshPort.value)),
+          username: userName.value,
+          onPasswordRequest: () => password.value,
+          keepAliveInterval: const Duration(seconds: 30),
+        );
+        isConnected.value = true;
+
+        Get.snackbar(
+          'Connection Successful',
+          'Connected to LG Rigs',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+
+        return true;
+      } on SocketException catch (e) {
+        print(e);
+        isConnected.value = false;
+        retryCount++;
+
+        if (retryCount == 1) {
+          Get.snackbar(
+            'Connection Error',
+            'Failed to connect to LG. Retrying connection (attempt $retryCount)...',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+        }
+
+        await Future.delayed(const Duration(seconds: 1));
+
+        continue;
+      }
+    }
+
+    if (!isConnected.value) {
+      Get.snackbar(
+        'Connection Error',
+        'Failed to connect after $maxRetries attempts.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+
+      print('Failed to connect after $maxRetries attempts.');
       return false;
     }
+
+    return true;
   }
 
 //shutdown LG
@@ -92,6 +138,7 @@ class SettingViewModel extends GetxController {
       for (int i = int.parse(numberOfRigs.value); i > 0; i--) {
         await client!.execute(
             'sshpass -p $password ssh -t lg$i "echo $password | sudo -S poweroff"');
+        await Future.delayed(const Duration(seconds: 1));
       }
 
       return null;
@@ -134,12 +181,25 @@ class SettingViewModel extends GetxController {
       if (ipAddress.value.isEmpty) {
         return null;
       }
+
+      List<Future<SSHSession?>> commands = [];
+
       for (int i = int.parse(numberOfRigs.value); i > 0; i--) {
-        await client!.execute(
-            'sshpass -p $password ssh -t lg$i "echo $password | sudo -S reboot"');
+        commands.add(client!.execute(
+            'sshpass -p $password ssh -t lg$i "echo $password | sudo -S reboot"'));
+        await Future.delayed(const Duration(seconds: 1));
       }
-      return null;
+
+      List<SSHSession?> results = await Future.wait(commands);
+      client!.close();
+      isConnected.value = false;
+      await Future.delayed(const Duration(seconds: 10));
+
+      await connectToLG();
+
+      return results.isNotEmpty ? results.last : null;
     } catch (e) {
+      isConnected.value = false;
       return null;
     }
   }
@@ -150,12 +210,144 @@ class SettingViewModel extends GetxController {
       if (ipAddress.value.isEmpty) {
         return null;
       }
-      SSHSession result =
+      final result =
           await client!.execute('echo "search=$search" > /tmp/query.txt');
 
       return result;
     } catch (e) {
       return null;
     }
+  }
+
+  int get leftScreen {
+    if (int.parse(numberOfRigs.value) == 1) {
+      return 1;
+    }
+
+    return (int.parse(numberOfRigs.value) / 2).floor() + 2;
+  }
+
+  int get rightScreen {
+    if (int.parse(numberOfRigs.value) == 1) {
+      return 1;
+    }
+
+    return (int.parse(numberOfRigs.value) / 2).floor() + 1;
+  }
+
+//clean
+  Future<void> cleanKML() async {
+    String kmlName = '''
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"
+xmlns:gx="http://www.google.com/kml/ext/2.2"
+xmlns:kml="http://www.opengis.net/kml/2.2"
+xmlns:atom="http://www.w3.org/2005/Atom">
+  <Document id="3">
+  </Document>
+</kml>
+''';
+
+    try {
+      if (ipAddress.value.isEmpty) {
+        return;
+      }
+      await client!
+          .execute("echo ' ' > /var/www/html/kml/slave_$rightScreen.kml");
+      await Future.delayed(const Duration(seconds: 1));
+      await client!
+          .execute("echo '$kmlName' > /var/www/html/kml/slave_$leftScreen.kml");
+    } catch (e) {
+      return;
+    }
+  }
+
+//send kml
+  Future<SSHSession?> sendKMLToLG(String slaveNumber) async {
+    String kmlName = '''
+<kml xmlns="http://www.opengis.net/kml/2.2"
+     xmlns:atom="http://www.w3.org/2005/Atom"
+     xmlns:gx="http://www.google.com/kml/ext/2.2">
+    <Document>
+        <Folder>
+            <name>Logos</name>
+            <ScreenOverlay>
+                <name>Logo</name>
+                <Icon>
+                    <href>https://raw.githubusercontent.com/oiiakm/Laser-Slides/main/screenshots/app_logo.png</href>
+                </Icon>
+                <overlayXY x="0" y="1" xunits="fraction" yunits="fraction"/>
+                <screenXY x="0.02" y="1" xunits="fraction" yunits="fraction"/>
+                <rotationXY x="0" y="0" xunits="fraction" yunits="fraction"/>
+                <!-- Set the size to 30x30 -->
+                <size x="500" y="500" xunits="pixels" yunits="pixels"/>
+            </ScreenOverlay>
+        </Folder>
+    </Document>
+</kml>
+''';
+    try {
+      if (ipAddress.value.isEmpty) {
+        return null;
+      }
+      SSHSession result = await client!.execute(
+          "echo '$kmlName' > /var/www/html/kml/slave_$slaveNumber.kml");
+
+      return result;
+    } catch (e) {
+      return null;
+    }
+  }
+
+//setup slave to refresh every 2 seconds
+  Future<void> setRefresh() async {
+    await connectToLG();
+    const search = '<href>##LG_PHPIFACE##kml\\/slave_{{slave}}.kml<\\/href>';
+    const replace =
+        '<href>##LG_PHPIFACE##kml\\/slave_{{slave}}.kml<\\/href><refreshMode>onInterval<\\/refreshMode><refreshInterval>2<\\/refreshInterval>';
+    final command =
+        'echo $password | sudo -S sed -i "s/$search/$replace/" ~/earth/kml/slave/myplaces.kml';
+
+    final clear =
+        'echo $password | sudo -S sed -i "s/$replace/$search/" ~/earth/kml/slave/myplaces.kml';
+
+    for (var i = 2; i <= int.parse(numberOfRigs.value); i++) {
+      final clearCmd = clear.replaceAll('{{slave}}', i.toString());
+      final cmd = command.replaceAll('{{slave}}', i.toString());
+      String query = 'sshpass -p $password ssh -t lg$i \'{{cmd}}\'';
+
+      try {
+        await client!.execute(query.replaceAll('{{cmd}}', clearCmd));
+        await client!.execute(query.replaceAll('{{cmd}}', cmd));
+      } catch (e) {
+        print(e);
+      }
+    }
+    Future.delayed(const Duration(seconds: 1));
+    await rebootLG();
+  }
+
+  ///slave screens to stop refreshing.
+  Future<void> stopRefresh() async {
+    await connectToLG();
+    const search =
+        '<href>##LG_PHPIFACE##kml\\/slave_{{slave}}.kml<\\/href><refreshMode>onInterval<\\/refreshMode><refreshInterval>2<\\/refreshInterval>';
+    const replace = '<href>##LG_PHPIFACE##kml\\/slave_{{slave}}.kml<\\/href>';
+
+    final clear =
+        'echo $password | sudo -S sed -i "s/$search/$replace/" ~/earth/kml/slave/myplaces.kml';
+
+    for (var i = 2; i <= int.parse(numberOfRigs.value); i++) {
+      final cmd = clear.replaceAll('{{slave}}', i.toString());
+      String query = 'sshpass -p $password ssh -t lg$i \'$cmd\'';
+
+      try {
+        await client!.execute(query);
+      } catch (e) {
+        print(e);
+      }
+    }
+    Future.delayed(const Duration(seconds: 1));
+    await rebootLG();
   }
 }

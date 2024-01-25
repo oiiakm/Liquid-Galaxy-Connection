@@ -40,25 +40,29 @@ class SettingView extends StatelessWidget {
                   alignment: Alignment.topLeft,
                   child: Row(
                     children: [
-                      Icon(
-                        _viewModel.isConnected.value
-                            ? Icons.check_circle
-                            : Icons.error,
-                        color: _viewModel.isConnected.value
-                            ? Colors.green
-                            : Colors.red,
-                        size: 30.0,
-                      ),
-                      const SizedBox(width: 5.0),
-                      Text(
-                        _viewModel.isConnected.value
-                            ? 'Connected'
-                            : 'Disconnected',
-                        style: TextStyle(
+                      Obx(
+                        () => Icon(
+                          _viewModel.isConnected.value
+                              ? Icons.check_circle
+                              : Icons.error,
                           color: _viewModel.isConnected.value
                               ? Colors.green
                               : Colors.red,
-                          fontSize: 20.0,
+                          size: 30.0,
+                        ),
+                      ),
+                      const SizedBox(width: 5.0),
+                      Obx(
+                        () => Text(
+                          _viewModel.isConnected.value
+                              ? 'Connected'
+                              : 'Disconnected',
+                          style: TextStyle(
+                            color: _viewModel.isConnected.value
+                                ? Colors.green
+                                : Colors.red,
+                            fontSize: 20.0,
+                          ),
                         ),
                       ),
                     ],
@@ -125,9 +129,10 @@ class SettingView extends StatelessWidget {
                             onPressed: () async {
                               await _viewModel.updateData();
 
-                              SettingViewModel ssh = SettingViewModel();
+                              SettingViewModel ssh =
+                                  Get.put(SettingViewModel());
 
-                              ssh.connectToLG().then((result) {
+                              await ssh.connectToLG().then((result) {
                                 if (result == true) {
                                   _viewModel.updateConnectionStatus(true);
                                   print('Connected to LG successfully');

@@ -5,7 +5,7 @@ import 'package:liquid_galaxy_connection/view/setting_view.dart';
 
 class AppRoutes {
   static final List<GetPage> pages = [
-    GetPage(name: '/', page: () => HomeView()),
+    GetPage(name: '/', page: () => const HomeView()),
     GetPage(name: '/route_error', page: () => const RouteErrorView()),
     GetPage(name: '/settings', page: () =>  SettingView()),
   ];
