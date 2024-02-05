@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class SettingViewModel extends GetxController {
+class SSHController extends GetxController {
   late RxString ipAddress = ''.obs;
   late RxString sshPort = ''.obs;
   late RxString userName = ''.obs;
@@ -84,7 +84,7 @@ class SettingViewModel extends GetxController {
         isConnected.value = true;
 
         Get.snackbar(
-          'Connection Successful',
+          'Successful',
           'Connected to LG Rigs',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.green,
@@ -99,8 +99,8 @@ class SettingViewModel extends GetxController {
 
         if (retryCount == 1) {
           Get.snackbar(
-            'Connection Error',
-            'Failed to connect to LG. Retrying connection (attempt $retryCount)...',
+            'Failed',
+            'Retrying connection (attempt $retryCount)...',
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: Colors.red,
             colorText: Colors.white,
@@ -219,7 +219,7 @@ class SettingViewModel extends GetxController {
     }
   }
 
-  int get leftScreen {
+  int get leftSlave {
     if (int.parse(numberOfRigs.value) == 1) {
       return 1;
     }
@@ -227,7 +227,7 @@ class SettingViewModel extends GetxController {
     return (int.parse(numberOfRigs.value) / 2).floor() + 2;
   }
 
-  int get rightScreen {
+  int get rightSlave {
     if (int.parse(numberOfRigs.value) == 1) {
       return 1;
     }
@@ -253,10 +253,10 @@ xmlns:atom="http://www.w3.org/2005/Atom">
         return;
       }
       await client!
-          .execute("echo ' ' > /var/www/html/kml/slave_$rightScreen.kml");
+          .execute("echo '$kmlName' > /var/www/html/kml/slave_$rightSlave.kml");
       await Future.delayed(const Duration(seconds: 1));
       await client!
-          .execute("echo '$kmlName' > /var/www/html/kml/slave_$leftScreen.kml");
+          .execute("echo '$kmlName' > /var/www/html/kml/slave_$leftSlave.kml");
     } catch (e) {
       return;
     }
@@ -349,5 +349,76 @@ xmlns:atom="http://www.w3.org/2005/Atom">
     }
     Future.delayed(const Duration(seconds: 1));
     await rebootLG();
+  }
+
+//visit my city
+  Future<void> visitMyCity() async {
+    double latitude = 24.2129;
+    double longitude = 83.2403;
+    String orbitLookAtLinear =
+        '<gx:duration>3</gx:duration><gx:flyToMode>smooth</gx:flyToMode><LookAt><longitude>$longitude</longitude><latitude>$latitude</latitude><range>900</range><tilt>60</tilt><heading>10.0</heading><gx:altitudeMode>relativeToGround</gx:altitudeMode></LookAt>';
+
+    await client!
+        .execute('echo "flytoview=$orbitLookAtLinear" > /tmp/query.txt');
+  }
+
+  // start orbit
+  Future<void> startOrbit() async {
+    double latitude = 24.2129;
+    double longitude = 83.2403;
+
+    try {
+      int i = 0;
+      while (true) {
+        double angle = i.toDouble() % 360;
+        String orbitLookAtLinear =
+            '<gx:duration>3</gx:duration><gx:flyToMode>smooth</gx:flyToMode><LookAt><longitude>$longitude</longitude><latitude>$latitude</latitude><range>900</range><tilt>60</tilt><heading>$angle</heading><gx:altitudeMode>relativeToGround</gx:altitudeMode></LookAt>';
+
+        await client!
+            .execute('echo "flytoview=$orbitLookAtLinear" > /tmp/query.txt');
+        await Future.delayed(const Duration(seconds: 3));
+
+        i += 10;
+      }
+    } catch (error) {
+      print(error);
+    }
+  }
+
+  //send HTML bubble
+  Future<SSHSession?> sendHTMLBubble() async {
+    String kmlName = '''
+<kml xmlns="http://www.opengis.net/kml/2.2"
+     xmlns:atom="http://www.w3.org/2005/Atom"
+     xmlns:gx="http://www.google.com/kml/ext/2.2">
+    <Document>
+        <Folder>
+            <name>Logos</name>
+            <ScreenOverlay>
+                <name>Logo</name>
+                <Icon>
+                    <href>https://raw.githubusercontent.com/oiiakm/Liquid-Galaxy-Connection/main/assets/name_city.jpg</href>
+                </Icon>
+                <overlayXY x="0" y="1" xunits="fraction" yunits="fraction"/>
+                <screenXY x="0.02" y="1" xunits="fraction" yunits="fraction"/>
+                <rotationXY x="0" y="0" xunits="fraction" yunits="fraction"/>
+                <!-- Set the size to 30x30 -->
+                <size x="500" y="500" xunits="pixels" yunits="pixels"/>
+            </ScreenOverlay>
+        </Folder>
+    </Document>
+</kml>
+''';
+    try {
+      if (ipAddress.value.isEmpty) {
+        return null;
+      }
+      SSHSession result = await client!
+          .execute("echo '$kmlName' > /var/www/html/kml/slave_$rightSlave.kml");
+
+      return result;
+    } catch (e) {
+      return null;
+    }
   }
 }

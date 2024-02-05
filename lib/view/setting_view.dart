@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:liquid_galaxy_connection/viewmodel/setting_view_model.dart';
+import 'package:liquid_galaxy_connection/controller/ssh_controller.dart';
 import 'package:liquid_galaxy_connection/widgets/custome_text_field_widget.dart';
 
 class SettingView extends StatelessWidget {
-  final SettingViewModel _viewModel = Get.put(SettingViewModel());
+  final SSHController _viewModel = Get.put(SSHController());
 
   SettingView({Key? key}) : super(key: key);
 
@@ -129,8 +129,7 @@ class SettingView extends StatelessWidget {
                             onPressed: () async {
                               await _viewModel.updateData();
 
-                              SettingViewModel ssh =
-                                  Get.put(SettingViewModel());
+                              SSHController ssh = Get.put(SSHController());
 
                               await ssh.connectToLG().then((result) {
                                 if (result == true) {

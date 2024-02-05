@@ -1,7 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:liquid_galaxy_connection/viewmodel/setting_view_model.dart';
+import 'package:liquid_galaxy_connection/controller/ssh_controller.dart';
 import 'package:liquid_galaxy_connection/widgets/custom_planet_widget.dart';
 import 'package:liquid_galaxy_connection/widgets/custom_star_widget.dart';
 import 'package:liquid_galaxy_connection/widgets/custom_button_widget.dart';
@@ -17,7 +17,7 @@ class _HomeViewState extends State<HomeView>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _animation;
-  final SettingViewModel _viewModel = Get.put(SettingViewModel());
+  final SSHController _controller = Get.put(SSHController());
   @override
   void initState() {
     super.initState();
@@ -87,6 +87,11 @@ class _HomeViewState extends State<HomeView>
                     ),
                   ),
                 ),
+                Image.asset(
+                  'assets/logo.png',
+                  height: 400,
+                  width: 310,
+                ),
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -97,15 +102,15 @@ class _HomeViewState extends State<HomeView>
                         CustomButtonWidget(
                           text: 'REBOOT LG',
                           onPressed: () async {
-                            await _viewModel.rebootLG();
-
+                            _showWarningDialog(
+                                context, "Are you sure yo want to reboot!");
                           },
                         ),
                         const SizedBox(width: 50.0),
                         CustomButtonWidget(
-                          text: 'SEARCH',
+                          text: 'VISIT MY CITY',
                           onPressed: () async {
-                            _showSearchDialog(context);
+                            _controller.visitMyCity();
                           },
                         ),
                       ],
@@ -116,16 +121,43 @@ class _HomeViewState extends State<HomeView>
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         CustomButtonWidget(
+                          text: 'START ORBIT',
+                          onPressed: () async {
+                            await _controller.startOrbit();
+                          },
+                        ),
+                        const SizedBox(width: 50.0),
+                        CustomButtonWidget(
+                          text: 'SEND HTML BUBBLE',
+                          onPressed: () async {
+                            _controller.sendHTMLBubble();
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 100.0),
+                    CustomButtonWidget(
+                      text: 'SEARCH',
+                      onPressed: () async {
+                        _showSearchDialog(context);
+                      },
+                    ),
+                    const SizedBox(height: 50.0),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        CustomButtonWidget(
                           text: 'RELAUNCH LG',
                           onPressed: () async {
-                            await _viewModel.reLaunchLG();
+                            await _controller.reLaunchLG();
                           },
                         ),
                         const SizedBox(width: 50.0),
                         CustomButtonWidget(
                           text: 'SHUTDOWN LG',
                           onPressed: () async {
-                            await _viewModel.shutdownLG();
+                            await _controller.shutdownLG();
                           },
                         ),
                       ],
@@ -137,14 +169,14 @@ class _HomeViewState extends State<HomeView>
                         CustomButtonWidget(
                           text: 'CLEAN KML',
                           onPressed: () async {
-                            await _viewModel.cleanKML();
+                            await _controller.cleanKML();
                           },
                         ),
                         const SizedBox(width: 50.0),
                         CustomButtonWidget(
                           text: 'SEND KML',
                           onPressed: () async {
-                            await _viewModel.sendKMLToLG("3");
+                            await _controller.sendKMLToLG("3");
                           },
                         ),
                       ],
@@ -157,7 +189,7 @@ class _HomeViewState extends State<HomeView>
                         CustomButtonWidget(
                           text: 'START REFRESH',
                           onPressed: () async {
-                            _showRefreshDialog(context,
+                            _showWarningDialog(context,
                                 "The slave will start refreshing every 2 seconds.");
                           },
                         ),
@@ -165,7 +197,7 @@ class _HomeViewState extends State<HomeView>
                         CustomButtonWidget(
                           text: 'STOP REFRESH',
                           onPressed: () async {
-                            _showRefreshDialog(
+                            _showWarningDialog(
                                 context, "The slave will stop refreshing");
                           },
                         ),
@@ -318,7 +350,7 @@ class _HomeViewState extends State<HomeView>
                     ),
                     onPressed: () async {
                       String search = searchController.text;
-                      await _viewModel.query(search);
+                      await _controller.query(search);
                       Get.back();
                     },
                     child: Container(
@@ -347,7 +379,7 @@ class _HomeViewState extends State<HomeView>
     );
   }
 
-  void _showRefreshDialog(context, String message) {
+  void _showWarningDialog(context, String message) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -360,7 +392,7 @@ class _HomeViewState extends State<HomeView>
           ),
           content: Container(
             alignment: Alignment.center,
-            width: 350,
+            width: 360,
             height: 250,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
@@ -413,11 +445,15 @@ class _HomeViewState extends State<HomeView>
                       onPressed: () async {
                         if (message
                             .startsWith("The slave will start refreshing")) {
-                          await _viewModel.setRefresh();
+                          await _controller.setRefresh();
                           Get.back();
                         } else if (message
                             .startsWith("The slave will stop refreshing")) {
-                          await _viewModel.stopRefresh();
+                          await _controller.stopRefresh();
+                          Get.back();
+                        } else if (message
+                            .startsWith("Are you sure yo want to reboot")) {
+                          await _controller.rebootLG();
                           Get.back();
                         }
                       },
