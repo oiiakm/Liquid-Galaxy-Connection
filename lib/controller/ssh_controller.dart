@@ -12,8 +12,6 @@ class SSHController extends GetxController {
   late RxString numberOfRigs = ''.obs;
   RxBool isConnected = false.obs;
 
-  SSHClient? client;
-
   @override
   void onInit() {
     super.onInit();
@@ -54,7 +52,6 @@ class SSHController extends GetxController {
       await prefs.setString('userName', userName.value);
       await prefs.setString('password', password.value);
       await prefs.setString('numberOfRigs', numberOfRigs.value);
-      isConnected.value = true;
     } catch (error) {
       print('Error updating data: $error');
 
@@ -75,7 +72,7 @@ class SSHController extends GetxController {
       await fetchData();
 
       try {
-        client = SSHClient(
+        SSHClient(
           await SSHSocket.connect(ipAddress.value, int.parse(sshPort.value)),
           username: userName.value,
           onPasswordRequest: () => password.value,
@@ -135,8 +132,12 @@ class SSHController extends GetxController {
       if (ipAddress.value.isEmpty) {
         return null;
       }
+      SSHClient? client = SSHClient(
+          await SSHSocket.connect(ipAddress.value, int.parse(sshPort.value)),
+          username: userName.value,
+          onPasswordRequest: () => password.value);
       for (int i = int.parse(numberOfRigs.value); i > 0; i--) {
-        await client!.execute(
+        await client.execute(
             'sshpass -p $password ssh -t lg$i "echo $password | sudo -S poweroff"');
         await Future.delayed(const Duration(seconds: 1));
       }
@@ -153,8 +154,11 @@ class SSHController extends GetxController {
       if (ipAddress.value.isEmpty) {
         return null;
       }
-
-      final result = await client!.execute("""RELAUNCH_CMD="\\
+      SSHClient? client = SSHClient(
+          await SSHSocket.connect(ipAddress.value, int.parse(sshPort.value)),
+          username: userName.value,
+          onPasswordRequest: () => password.value);
+      final result = await client.execute("""RELAUNCH_CMD="\\
          if [ -f /etc/init/lxdm.conf ]; then
          export SERVICE=lxdm
          elif [ -f /etc/init/lightdm.conf ]; then
@@ -183,15 +187,18 @@ class SSHController extends GetxController {
       }
 
       List<Future<SSHSession?>> commands = [];
-
+      SSHClient? client = SSHClient(
+          await SSHSocket.connect(ipAddress.value, int.parse(sshPort.value)),
+          username: userName.value,
+          onPasswordRequest: () => password.value);
       for (int i = int.parse(numberOfRigs.value); i > 0; i--) {
-        commands.add(client!.execute(
+        commands.add(client.execute(
             'sshpass -p $password ssh -t lg$i "echo $password | sudo -S reboot"'));
         await Future.delayed(const Duration(seconds: 1));
       }
 
       List<SSHSession?> results = await Future.wait(commands);
-      client!.close();
+      client.close();
       isConnected.value = false;
       await Future.delayed(const Duration(seconds: 10));
 
@@ -210,8 +217,12 @@ class SSHController extends GetxController {
       if (ipAddress.value.isEmpty) {
         return null;
       }
+      SSHClient? client = SSHClient(
+          await SSHSocket.connect(ipAddress.value, int.parse(sshPort.value)),
+          username: userName.value,
+          onPasswordRequest: () => password.value);
       final result =
-          await client!.execute('echo "search=$search" > /tmp/query.txt');
+          await client.execute('echo "search=$search" > /tmp/query.txt');
 
       return result;
     } catch (e) {
@@ -252,10 +263,14 @@ xmlns:atom="http://www.w3.org/2005/Atom">
       if (ipAddress.value.isEmpty) {
         return;
       }
-      await client!
+      SSHClient? client = SSHClient(
+          await SSHSocket.connect(ipAddress.value, int.parse(sshPort.value)),
+          username: userName.value,
+          onPasswordRequest: () => password.value);
+      await client
           .execute("echo '$kmlName' > /var/www/html/kml/slave_$rightSlave.kml");
       await Future.delayed(const Duration(seconds: 1));
-      await client!
+      await client
           .execute("echo '$kmlName' > /var/www/html/kml/slave_$leftSlave.kml");
     } catch (e) {
       return;
@@ -263,7 +278,7 @@ xmlns:atom="http://www.w3.org/2005/Atom">
   }
 
 //send kml
-  Future<SSHSession?> sendKMLToLG(String slaveNumber) async {
+  Future<SSHSession?> sendKMLToLG() async {
     String kmlName = '''
 <kml xmlns="http://www.opengis.net/kml/2.2"
      xmlns:atom="http://www.w3.org/2005/Atom"
@@ -279,7 +294,6 @@ xmlns:atom="http://www.w3.org/2005/Atom">
                 <overlayXY x="0" y="1" xunits="fraction" yunits="fraction"/>
                 <screenXY x="0.02" y="1" xunits="fraction" yunits="fraction"/>
                 <rotationXY x="0" y="0" xunits="fraction" yunits="fraction"/>
-                <!-- Set the size to 30x30 -->
                 <size x="500" y="500" xunits="pixels" yunits="pixels"/>
             </ScreenOverlay>
         </Folder>
@@ -290,8 +304,12 @@ xmlns:atom="http://www.w3.org/2005/Atom">
       if (ipAddress.value.isEmpty) {
         return null;
       }
-      SSHSession result = await client!.execute(
-          "echo '$kmlName' > /var/www/html/kml/slave_$slaveNumber.kml");
+      SSHClient? client = SSHClient(
+          await SSHSocket.connect(ipAddress.value, int.parse(sshPort.value)),
+          username: userName.value,
+          onPasswordRequest: () => password.value);
+      SSHSession result = await client
+          .execute("echo '$kmlName' > /var/www/html/kml/slave_$rightSlave.kml");
 
       return result;
     } catch (e) {
@@ -317,8 +335,12 @@ xmlns:atom="http://www.w3.org/2005/Atom">
       String query = 'sshpass -p $password ssh -t lg$i \'{{cmd}}\'';
 
       try {
-        await client!.execute(query.replaceAll('{{cmd}}', clearCmd));
-        await client!.execute(query.replaceAll('{{cmd}}', cmd));
+        SSHClient? client = SSHClient(
+            await SSHSocket.connect(ipAddress.value, int.parse(sshPort.value)),
+            username: userName.value,
+            onPasswordRequest: () => password.value);
+        await client.execute(query.replaceAll('{{cmd}}', clearCmd));
+        await client.execute(query.replaceAll('{{cmd}}', cmd));
       } catch (e) {
         print(e);
       }
@@ -342,7 +364,11 @@ xmlns:atom="http://www.w3.org/2005/Atom">
       String query = 'sshpass -p $password ssh -t lg$i \'$cmd\'';
 
       try {
-        await client!.execute(query);
+        SSHClient? client = SSHClient(
+            await SSHSocket.connect(ipAddress.value, int.parse(sshPort.value)),
+            username: userName.value,
+            onPasswordRequest: () => password.value);
+        await client.execute(query);
       } catch (e) {
         print(e);
       }
@@ -353,17 +379,25 @@ xmlns:atom="http://www.w3.org/2005/Atom">
 
 //visit my city
   Future<void> visitMyCity() async {
+    SSHClient? client = SSHClient(
+        await SSHSocket.connect(ipAddress.value, int.parse(sshPort.value)),
+        username: userName.value,
+        onPasswordRequest: () => password.value);
     double latitude = 24.2129;
     double longitude = 83.2403;
     String orbitLookAtLinear =
         '<gx:duration>3</gx:duration><gx:flyToMode>smooth</gx:flyToMode><LookAt><longitude>$longitude</longitude><latitude>$latitude</latitude><range>900</range><tilt>60</tilt><heading>10.0</heading><gx:altitudeMode>relativeToGround</gx:altitudeMode></LookAt>';
 
-    await client!
+    await client
         .execute('echo "flytoview=$orbitLookAtLinear" > /tmp/query.txt');
   }
 
   // start orbit
   Future<void> startOrbit() async {
+    SSHClient? client = SSHClient(
+        await SSHSocket.connect(ipAddress.value, int.parse(sshPort.value)),
+        username: userName.value,
+        onPasswordRequest: () => password.value);
     double latitude = 24.2129;
     double longitude = 83.2403;
 
@@ -374,7 +408,7 @@ xmlns:atom="http://www.w3.org/2005/Atom">
         String orbitLookAtLinear =
             '<gx:duration>3</gx:duration><gx:flyToMode>smooth</gx:flyToMode><LookAt><longitude>$longitude</longitude><latitude>$latitude</latitude><range>900</range><tilt>60</tilt><heading>$angle</heading><gx:altitudeMode>relativeToGround</gx:altitudeMode></LookAt>';
 
-        await client!
+        await client
             .execute('echo "flytoview=$orbitLookAtLinear" > /tmp/query.txt');
         await Future.delayed(const Duration(seconds: 3));
 
@@ -413,7 +447,11 @@ xmlns:atom="http://www.w3.org/2005/Atom">
       if (ipAddress.value.isEmpty) {
         return null;
       }
-      SSHSession result = await client!
+      SSHClient? client = SSHClient(
+          await SSHSocket.connect(ipAddress.value, int.parse(sshPort.value)),
+          username: userName.value,
+          onPasswordRequest: () => password.value);
+      SSHSession result = await client
           .execute("echo '$kmlName' > /var/www/html/kml/slave_$rightSlave.kml");
 
       return result;

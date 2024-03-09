@@ -43,7 +43,7 @@ class _HomeViewState extends State<HomeView>
     return Scaffold(
       body: Stack(
         children: [
-          _buildBackground(),
+          _buildBackground(context),
           SingleChildScrollView(
             child: Column(
               children: [
@@ -176,7 +176,7 @@ class _HomeViewState extends State<HomeView>
                         CustomButtonWidget(
                           text: 'SEND KML',
                           onPressed: () async {
-                            await _controller.sendKMLToLG("3");
+                            await _controller.sendKMLToLG();
                           },
                         ),
                       ],
@@ -213,7 +213,10 @@ class _HomeViewState extends State<HomeView>
     );
   }
 
-  Widget _buildBackground() {
+  Widget _buildBackground(context) {
+    double screenWidth = MediaQuery.of(context).size.width;
+    double screenHeight = MediaQuery.of(context).size.height;
+
     return Stack(
       children: [
         Container(
@@ -243,15 +246,17 @@ class _HomeViewState extends State<HomeView>
             },
           ),
         ),
-        Stack(
-          children: List.generate(
-            180,
-            (index) => Positioned(
-              left: _getRandomPosition(),
-              top: _getRandomPosition(),
-              child: CustomStarWidget(
-                size: Random().nextInt(30).toDouble() + 10,
-                color: _getRandomColor(),
+        Positioned.fill(
+          child: Stack(
+            children: List.generate(
+              180,
+              (index) => Positioned(
+                left: _getRandomPosition(screenWidth),
+                top: _getRandomPosition(screenHeight),
+                child: CustomStarWidget(
+                  size: Random().nextInt(30).toDouble() + 10,
+                  color: _getRandomColor(),
+                ),
               ),
             ),
           ),
@@ -260,8 +265,8 @@ class _HomeViewState extends State<HomeView>
     );
   }
 
-  double _getRandomPosition() {
-    return Random().nextDouble() * Get.width;
+  double _getRandomPosition(double screenSize) {
+    return Random().nextDouble() * screenSize;
   }
 
   Color _getRandomColor() {

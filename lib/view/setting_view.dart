@@ -127,16 +127,9 @@ class SettingView extends StatelessWidget {
                         Center(
                           child: ElevatedButton(
                             onPressed: () async {
+                              _viewModel.updateConnectionStatus(false);
                               await _viewModel.updateData();
-
-                              SSHController ssh = Get.put(SSHController());
-
-                              await ssh.connectToLG().then((result) {
-                                if (result == true) {
-                                  _viewModel.updateConnectionStatus(true);
-                                  print('Connected to LG successfully');
-                                }
-                              });
+                              await _viewModel.connectToLG();
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor:
