@@ -129,7 +129,7 @@ class SettingView extends StatelessWidget {
                             onPressed: () async {
                               _viewModel.updateConnectionStatus(false);
                               await _viewModel.updateData();
-                              await _viewModel.connectToLG();
+                              await _viewModel.connectToLG(maxRetries: 1);
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor:
