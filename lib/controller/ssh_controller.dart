@@ -73,13 +73,21 @@ class SSHController extends GetxController {
       await fetchData();
 
       try {
+        int port;
+        if (sshPort.value != '') {
+          port = int.parse(sshPort.value);
+        } else {
+          print('SSH Port value is null');
+          return false;
+        }
+
         client = SSHClient(
-          await SSHSocket.connect(ipAddress.value, int.parse(sshPort.value)),
+          await SSHSocket.connect(ipAddress.value, port),
           username: userName.value,
           onPasswordRequest: () => password.value,
-          keepAliveInterval: const Duration(seconds: 30),
+          keepAliveInterval: const Duration(seconds: 36000000),
+          onAuthenticated: () => isConnected.value = true,
         );
-        isConnected.value = true;
 
         Get.snackbar(
           'Successful',
@@ -108,6 +116,10 @@ class SSHController extends GetxController {
         await Future.delayed(const Duration(seconds: 1));
 
         continue;
+      } catch (e) {
+        print('Exception occurred: $e');
+        isConnected.value = false;
+        return false;
       }
     }
 
